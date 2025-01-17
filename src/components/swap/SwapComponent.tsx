@@ -59,23 +59,18 @@ export default function SwapComponent() {
   // Watch for transaction confirmation
   const waitForTransaction = async (txHash: `0x${string}`) => {
     if (!publicClient) {
-      notify.error("Network client not available");
+      notify.transaction.error("Network client not available");
       return;
     }
 
     try {
       const receipt = await publicClient.waitForTransactionReceipt({
         hash: txHash,
-        confirmations: 1,
       });
 
-      // The status in the receipt is a number, let's handle it properly
-      const isSuccess = Boolean(receipt.status); // Convert to boolean
-
-      if (isSuccess) {
+      if (receipt.status === "success") {
         await Promise.all([refetchBalanceA(), refetchBalanceB()]);
-
-        notify.transaction.success("Transaction successful", txHash);
+        notify.transaction.success("Swap successful!", txHash);
         setAmount("");
         setPendingTxHash(null);
       } else {
@@ -83,7 +78,6 @@ export default function SwapComponent() {
         setPendingTxHash(null);
       }
     } catch (error) {
-      console.error("Transaction error:", error);
       notify.transaction.error("Error processing transaction");
       setPendingTxHash(null);
     }
@@ -101,16 +95,10 @@ export default function SwapComponent() {
       // Check and handle approval
       if (needsApproval(amountInWei)) {
         notify.info("Approving token...");
-        try {
-          await approve();
-          notify.success("Token Approved");
-        } catch (error) {
-          notify.error("Approval failed");
-          return;
-        }
+        await approve();
+        notify.success("Token Approved");
       }
 
-      // Show pending notification
       notify.transaction.pending("Swapping tokens...");
 
       const txHash = await swap({
@@ -124,9 +112,10 @@ export default function SwapComponent() {
       await waitForTransaction(txHash);
     } catch (error) {
       console.error("Swap error:", error);
-      notify.transaction.error("Failed to swap tokens");
+      notify.transaction.error("Failed to initiate swap");
     }
   };
+
   // Switch tokens
   const handleSwitchTokens = () => {
     setTokenIn(tokenOut as `0x${string}`);

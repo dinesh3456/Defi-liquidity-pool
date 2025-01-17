@@ -81,27 +81,23 @@ export default function Pool() {
   // Wait for transaction confirmation
   const waitForTransaction = async (txHash: `0x${string}`) => {
     if (!publicClient) {
-      notify.error("Network client not available");
+      notify.transaction.error("Network client not available");
       return;
     }
 
     try {
       const receipt = await publicClient.waitForTransactionReceipt({
         hash: txHash,
-        confirmations: 1,
       });
 
-      const isSuccess = Boolean(receipt.status);
-
-      if (isSuccess) {
+      if (receipt.status === "success") {
         await Promise.all([
           refetchBalanceA(),
           refetchBalanceB(),
           refetchUserShares(),
           refetchReserves(),
         ]);
-
-        notify.transaction.success("Transaction successful", txHash);
+        notify.transaction.success("Transaction successful!", txHash);
         setAmountA("");
         setAmountB("");
         setPendingTxHash(null);
@@ -110,7 +106,6 @@ export default function Pool() {
         setPendingTxHash(null);
       }
     } catch (error) {
-      console.error("Transaction error:", error);
       notify.transaction.error("Error processing transaction");
       setPendingTxHash(null);
     }
@@ -127,24 +122,14 @@ export default function Pool() {
       // Check and handle approvals
       if (needsApprovalA(amountAWei)) {
         notify.info("Approving Token A...");
-        try {
-          await approveA();
-          notify.success("Token A Approved");
-        } catch (error) {
-          notify.error("Token A approval failed");
-          return;
-        }
+        await approveA();
+        notify.success("Token A Approved");
       }
 
       if (needsApprovalB(amountBWei)) {
         notify.info("Approving Token B...");
-        try {
-          await approveB();
-          notify.success("Token B Approved");
-        } catch (error) {
-          notify.error("Token B approval failed");
-          return;
-        }
+        await approveB();
+        notify.success("Token B Approved");
       }
 
       notify.transaction.pending("Adding liquidity...");
@@ -158,7 +143,6 @@ export default function Pool() {
 
       setPendingTxHash(txHash);
       await waitForTransaction(txHash);
-      console.log(txHash);
     } catch (error) {
       console.error("Add liquidity error:", error);
       notify.transaction.error("Failed to add liquidity");
