@@ -444,11 +444,5 @@
   "..\\..\\node_modules\\viem\\_esm\\utils\\signature\\recoverPublicKey.js -> @noble/curves/secp256k1": {
     "id": "..\\..\\node_modules\\viem\\_esm\\utils\\signature\\recoverPublicKey.js -> @noble/curves/secp256k1",
     "files": []
-  },
-  "swap.tsx -> @/components/swap/SwapComponent": {
-    "id": "swap.tsx -> @/components/swap/SwapComponent",
-    "files": [
-      "static/chunks/src_components_swap_SwapComponent_tsx.js"
-    ]
   }
 }

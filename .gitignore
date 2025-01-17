@@ -7,3 +7,5 @@ typechain-types
 dist
 cache
 artifacts
+.next
+next

@@ -35,7 +35,7 @@ export function NotificationProvider({
     (message: string, type: NotificationType, txHash?: string) => {
       const id = Date.now();
       setNotifications((prev) => [...prev, { id, message, type, txHash }]);
-
+      const timeout = type === "info" ? 5000 : 8000;
       // Auto remove after 5 seconds
       setTimeout(() => {
         removeNotification(id);
