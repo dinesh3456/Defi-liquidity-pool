@@ -3,6 +3,5 @@
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
   "/pool": "pages/pool.js",
-  "/swap": "pages/swap.js",
-  "/": "pages/index.js"
+  "/swap": "pages/swap.js"
 }
