@@ -19,7 +19,6 @@ A decentralized liquidity pool application enabling users to swap tokens and man
 The smart contract architecture consists of three main components:
 
 ```mermaid
-diagram
 classDiagram
     class ICustomToken {
         <<interface>>
