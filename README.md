@@ -142,7 +142,7 @@ G --> N
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/yourusername/defi-liquidity-pool.git
+   git clone https://github.com/dinesh3456/Defi-liquidity-pool.git
    cd defi-liquidity-pool
    ```
 
@@ -161,9 +161,11 @@ G --> N
    Update `.env` with your configuration:
 
    ```env
-   BASE_SEPOLIA_RPC_URL=your_rpc_url
-   PRIVATE_KEY=your_private_key
-   BASESCAN_API_KEY=your_api_key
+    NEXT_PUBLIC_WALLET_CONNECT_ID=your_wallet_connect_project_id
+    NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL=https://base-sepolia.g.alchemy.com/v2/JwkRF_vQJWBYFj5wXkkhUnYi1A5TwFhs
+    NEXT_PUBLIC_TOKENA_CONTRACT_ADDRESS=0xC280d96b5eacb5aCC13c4EC0f4f57690aED719a3
+    NEXT_PUBLIC_TOKENB_CONTRACT_ADDRESS=0xc3457ef738160fd5Ee4A33DA9d1580cf2fD5e486
+    NEXT_PUBLIC_LIQUIDITY_POOL_CONTRACT_ADDRESS=0xef26010E7609172B6C27aD2F14E3c6852dD5fae1 
    ```
 
 4. Deploy contracts:
