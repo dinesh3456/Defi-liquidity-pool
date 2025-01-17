@@ -1,9 +1,6 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config();
 
-const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
-const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || "";
-
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
@@ -16,18 +13,30 @@ module.exports = {
     },
   },
   networks: {
-    hardhat: {
-      chainId: 31337,
-    },
-    sepolia: {
-      url: `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-      accounts: [PRIVATE_KEY],
+    baseSepolia: {
+      url: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 84532,
+      verify: {
+        etherscan: {
+          apiUrl: "https://api-sepolia.basescan.org",
+        },
+      },
     },
   },
-  paths: {
-    sources: "./contracts",
-    tests: "./test",
-    cache: "./cache",
-    artifacts: "./artifacts",
+  etherscan: {
+    apiKey: {
+      baseSepolia: process.env.BASESCAN_API_KEY || "",
+    },
+    customChains: [
+      {
+        network: "baseSepolia",
+        chainId: 84532,
+        urls: {
+          apiURL: "https://api-sepolia.basescan.org/api",
+          browserURL: "https://sepolia.basescan.org",
+        },
+      },
+    ],
   },
 };
