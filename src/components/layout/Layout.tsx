@@ -2,6 +2,7 @@
 import { useAccount } from "wagmi";
 import { Header } from "./Header";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { NotificationContainer } from "../common/Notification";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { isConnected } = useAccount();
@@ -26,6 +27,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           children
         )}
       </main>
+      <NotificationContainer />
     </div>
   );
 }
