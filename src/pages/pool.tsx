@@ -1,7 +1,11 @@
-// src/pages/pool.tsx
 import { useState, useEffect } from "react";
 import { parseEther, formatEther } from "viem";
-import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import {
+  useAccount,
+  useReadContract,
+  useWriteContract,
+  usePublicClient,
+} from "wagmi";
 import { CONTRACTS } from "@/config/contracts";
 import { Button } from "@/components/common/Button";
 import { useNotification } from "@/hooks/useNotification";
@@ -15,21 +19,25 @@ export default function Pool() {
   const [mounted, setMounted] = useState(false);
   const [amountA, setAmountA] = useState("");
   const [amountB, setAmountB] = useState("");
+  const [pendingTxHash, setPendingTxHash] = useState<`0x${string}` | null>(
+    null
+  );
   const { address } = useAccount();
   const notify = useNotification();
+  const publicClient = usePublicClient();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   // Contract reads
-  const { data: reserves } = useReadContract({
+  const { data: reserves, refetch: refetchReserves } = useReadContract({
     address: CONTRACTS.liquidityPool.address as `0x${string}`,
     abi: liquidityPoolABI,
     functionName: "getReserves",
   });
 
-  const { data: userShares } = useReadContract({
+  const { data: userShares, refetch: refetchUserShares } = useReadContract({
     address: CONTRACTS.liquidityPool.address as `0x${string}`,
     abi: liquidityPoolABI,
     functionName: "shares",
@@ -63,10 +71,50 @@ export default function Pool() {
   );
 
   // Contract writes
-  const { writeContract: addLiquidity, isPending: isAddingLiquidity } =
+  const { writeContractAsync: addLiquidity, isPending: isAddingLiquidity } =
     useWriteContract();
-  const { writeContract: removeLiquidity, isPending: isRemovingLiquidity } =
-    useWriteContract();
+  const {
+    writeContractAsync: removeLiquidity,
+    isPending: isRemovingLiquidity,
+  } = useWriteContract();
+
+  // Wait for transaction confirmation
+  const waitForTransaction = async (txHash: `0x${string}`) => {
+    if (!publicClient) {
+      notify.error("Network client not available");
+      return;
+    }
+
+    try {
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+        confirmations: 1,
+      });
+
+      const isSuccess = Boolean(receipt.status);
+
+      if (isSuccess) {
+        await Promise.all([
+          refetchBalanceA(),
+          refetchBalanceB(),
+          refetchUserShares(),
+          refetchReserves(),
+        ]);
+
+        notify.transaction.success("Transaction successful", txHash);
+        setAmountA("");
+        setAmountB("");
+        setPendingTxHash(null);
+      } else {
+        notify.transaction.error("Transaction failed");
+        setPendingTxHash(null);
+      }
+    } catch (error) {
+      console.error("Transaction error:", error);
+      notify.transaction.error("Error processing transaction");
+      setPendingTxHash(null);
+    }
+  };
 
   // Add liquidity handler
   const handleAddLiquidity = async () => {
@@ -79,36 +127,44 @@ export default function Pool() {
       // Check and handle approvals
       if (needsApprovalA(amountAWei)) {
         notify.info("Approving Token A...");
-        await approveA();
-        notify.success("Token A Approved");
+        try {
+          await approveA();
+          notify.success("Token A Approved");
+        } catch (error) {
+          notify.error("Token A approval failed");
+          return;
+        }
       }
 
       if (needsApprovalB(amountBWei)) {
         notify.info("Approving Token B...");
-        await approveB();
-        notify.success("Token B Approved");
+        try {
+          await approveB();
+          notify.success("Token B Approved");
+        } catch (error) {
+          notify.error("Token B approval failed");
+          return;
+        }
       }
 
       notify.transaction.pending("Adding liquidity...");
 
-      await addLiquidity({
+      const txHash = await addLiquidity({
         address: CONTRACTS.liquidityPool.address as `0x${string}`,
         abi: liquidityPoolABI,
         functionName: "addLiquidity",
         args: [amountAWei, amountBWei],
       });
 
-      notify.transaction.success("Successfully added liquidity");
-
-      // Reset form and refetch balances
-      setAmountA("");
-      setAmountB("");
-      await Promise.all([refetchBalanceA(), refetchBalanceB()]);
+      setPendingTxHash(txHash);
+      await waitForTransaction(txHash);
+      console.log(txHash);
     } catch (error) {
-      notify.transaction.error("Failed to add liquidity");
       console.error("Add liquidity error:", error);
+      notify.transaction.error("Failed to add liquidity");
     }
   };
+
   // Remove liquidity handler
   const handleRemoveLiquidity = async () => {
     if (!userShares) return;
@@ -116,18 +172,18 @@ export default function Pool() {
     try {
       notify.transaction.pending("Removing liquidity...");
 
-      await removeLiquidity({
+      const txHash = await removeLiquidity({
         address: CONTRACTS.liquidityPool.address as `0x${string}`,
         abi: liquidityPoolABI,
         functionName: "removeLiquidity",
         args: [userShares],
       });
 
-      notify.transaction.success("Successfully removed liquidity");
-      await Promise.all([refetchBalanceA(), refetchBalanceB()]);
+      setPendingTxHash(txHash);
+      await waitForTransaction(txHash);
     } catch (error) {
-      notify.transaction.error("Failed to remove liquidity");
       console.error("Remove liquidity error:", error);
+      notify.transaction.error("Failed to remove liquidity");
     }
   };
 

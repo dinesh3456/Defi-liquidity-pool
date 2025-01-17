@@ -2,7 +2,7 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/swap": "pages/swap.js",
   "/pool": "pages/pool.js",
-  "/": "pages/index.js"
+  "/": "pages/index.js",
+  "/swap": "pages/swap.js"
 }

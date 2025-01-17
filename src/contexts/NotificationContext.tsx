@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { XCircle, CheckCircle2, Info } from "lucide-react";
+import { v4 as uuidv4 } from "uuid";
 
 type NotificationType = "success" | "error" | "info";
 
 interface Notification {
-  id: number;
+  id: string; // Unique ID for each notification
   message: string;
   type: NotificationType;
   txHash?: string;
@@ -17,7 +18,7 @@ interface NotificationContextType {
     type: NotificationType,
     txHash?: string
   ) => void;
-  removeNotification: (id: number) => void;
+  removeNotification: (id: string) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(
@@ -31,20 +32,34 @@ export function NotificationProvider({
 }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
+  const removeDuplicates = (
+    newNotification: Notification,
+    currentNotifications: Notification[]
+  ) => {
+    return currentNotifications.filter(
+      (notification) => notification.message !== newNotification.message
+    );
+  };
+
   const addNotification = useCallback(
     (message: string, type: NotificationType, txHash?: string) => {
-      const id = Date.now();
-      setNotifications((prev) => [...prev, { id, message, type, txHash }]);
+      const id = uuidv4();
+      const newNotification = { id, message, type, txHash };
 
-      // Auto remove after 5 seconds
+      setNotifications((prev) => {
+        const withoutDuplicates = removeDuplicates(newNotification, prev);
+        return [...withoutDuplicates, newNotification];
+      });
+
+      const timeout = type === "info" ? 3000 : 5000;
       setTimeout(() => {
         removeNotification(id);
-      }, 5000);
+      }, timeout);
     },
     []
   );
 
-  const removeNotification = useCallback((id: number) => {
+  const removeNotification = useCallback((id: string) => {
     setNotifications((prev) =>
       prev.filter((notification) => notification.id !== id)
     );
@@ -55,38 +70,36 @@ export function NotificationProvider({
       value={{ notifications, addNotification, removeNotification }}
     >
       {children}
-      {/* Notification Display */}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2">
-        {notifications.map(({ id, message, type, txHash }) => (
+      <div className="fixed top-4 right-4 z-[100] space-y-2 pointer-events-none">
+        {notifications.map((notification) => (
           <div
-            key={id}
-            className={`
-              flex items-center justify-between p-4 rounded-lg shadow-lg min-w-[300px] max-w-[400px]
+            key={notification.id}
+            className={`pointer-events-auto flex items-center justify-between p-4 rounded-lg shadow-lg
+              min-w-[300px] max-w-[400px] transform transition-all
               ${
-                type === "success"
-                  ? "bg-green-100 text-green-800"
-                  : type === "error"
-                  ? "bg-red-100 text-red-800"
-                  : "bg-blue-100 text-blue-800"
-              }
-            `}
+                notification.type === "success"
+                  ? "bg-green-100 text-green-800 border border-green-200"
+                  : notification.type === "error"
+                  ? "bg-red-100 text-red-800 border border-red-200"
+                  : "bg-blue-100 text-blue-800 border border-blue-200"
+              }`}
           >
             <div className="flex items-center space-x-3">
-              {type === "success" ? (
+              {notification.type === "success" ? (
                 <CheckCircle2 className="h-5 w-5" />
-              ) : type === "error" ? (
+              ) : notification.type === "error" ? (
                 <XCircle className="h-5 w-5" />
               ) : (
                 <Info className="h-5 w-5" />
               )}
               <div>
-                <p className="font-medium">{message}</p>
-                {txHash && (
+                <p className="font-medium">{notification.message}</p>
+                {notification.txHash && (
                   <a
-                    href={`${process.env.NEXT_PUBLIC_EXPLORER_URL}/tx/${txHash}`}
+                    href={`${process.env.NEXT_PUBLIC_EXPLORER_URL}/tx/${notification.txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm underline"
+                    className="text-sm underline hover:opacity-80"
                   >
                     View transaction
                   </a>
@@ -94,7 +107,7 @@ export function NotificationProvider({
               </div>
             </div>
             <button
-              onClick={() => removeNotification(id)}
+              onClick={() => removeNotification(notification.id)}
               className="ml-4 text-gray-500 hover:text-gray-700"
             >
               <XCircle className="h-4 w-4" />
@@ -113,11 +126,11 @@ export function useNotification() {
       "useNotification must be used within a NotificationProvider"
     );
   }
+
   return {
     ...context,
     notify: {
-      success: (message: string, txHash?: string) =>
-        context.addNotification(message, "success", txHash),
+      success: (message: string) => context.addNotification(message, "success"),
       error: (message: string) => context.addNotification(message, "error"),
       info: (message: string) => context.addNotification(message, "info"),
     },

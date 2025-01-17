@@ -1,7 +1,11 @@
-// src/components/swap/SwapComponent.tsx
 import { useState } from "react";
 import { parseEther, formatEther } from "viem";
-import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import {
+  useAccount,
+  useReadContract,
+  useWriteContract,
+  usePublicClient,
+} from "wagmi";
 import { ArrowDownUp } from "lucide-react";
 import { CONTRACTS } from "@/config/contracts";
 import { Button } from "@/components/common/Button";
@@ -15,8 +19,12 @@ export default function SwapComponent() {
   const [tokenIn, setTokenIn] = useState<`0x${string}`>(
     CONTRACTS.tokenA.address as `0x${string}`
   );
+  const [pendingTxHash, setPendingTxHash] = useState<`0x${string}` | null>(
+    null
+  );
   const { address } = useAccount();
   const notify = useNotification();
+  const publicClient = usePublicClient();
 
   const tokenOut =
     tokenIn === CONTRACTS.tokenA.address
@@ -24,13 +32,11 @@ export default function SwapComponent() {
       : CONTRACTS.tokenA.address;
 
   // Get balances
-  const { formattedBalance: balanceA } = useTokenBalance(
-    CONTRACTS.tokenA.address as `0x${string}`
-  );
+  const { formattedBalance: balanceA, refetch: refetchBalanceA } =
+    useTokenBalance(CONTRACTS.tokenA.address as `0x${string}`);
 
-  const { formattedBalance: balanceB } = useTokenBalance(
-    CONTRACTS.tokenB.address as `0x${string}`
-  );
+  const { formattedBalance: balanceB, refetch: refetchBalanceB } =
+    useTokenBalance(CONTRACTS.tokenB.address as `0x${string}`);
 
   // Get expected output amount
   const { data: amountOut } = useReadContract({
@@ -47,7 +53,41 @@ export default function SwapComponent() {
   );
 
   // Contract writes
-  const { writeContract: swap, isPending: isSwapping } = useWriteContract();
+  const { writeContractAsync: swap, isPending: isSwapping } =
+    useWriteContract();
+
+  // Watch for transaction confirmation
+  const waitForTransaction = async (txHash: `0x${string}`) => {
+    if (!publicClient) {
+      notify.error("Network client not available");
+      return;
+    }
+
+    try {
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+        confirmations: 1,
+      });
+
+      // The status in the receipt is a number, let's handle it properly
+      const isSuccess = Boolean(receipt.status); // Convert to boolean
+
+      if (isSuccess) {
+        await Promise.all([refetchBalanceA(), refetchBalanceB()]);
+
+        notify.transaction.success("Transaction successful", txHash);
+        setAmount("");
+        setPendingTxHash(null);
+      } else {
+        notify.transaction.error("Transaction failed");
+        setPendingTxHash(null);
+      }
+    } catch (error) {
+      console.error("Transaction error:", error);
+      notify.transaction.error("Error processing transaction");
+      setPendingTxHash(null);
+    }
+  };
 
   // Swap handler
   const handleSwap = async () => {
@@ -61,27 +101,32 @@ export default function SwapComponent() {
       // Check and handle approval
       if (needsApproval(amountInWei)) {
         notify.info("Approving token...");
-        await approve();
-        notify.success("Token Approved");
+        try {
+          await approve();
+          notify.success("Token Approved");
+        } catch (error) {
+          notify.error("Approval failed");
+          return;
+        }
       }
 
+      // Show pending notification
       notify.transaction.pending("Swapping tokens...");
 
-      await swap({
+      const txHash = await swap({
         address: CONTRACTS.liquidityPool.address as `0x${string}`,
         abi: liquidityPoolABI,
         functionName: "swap",
         args: [tokenIn, amountInWei, minAmountOut, deadline],
       });
 
-      notify.transaction.success("Successfully swapped tokens");
-      setAmount("");
+      setPendingTxHash(txHash);
+      await waitForTransaction(txHash);
     } catch (error) {
-      notify.transaction.error("Failed to swap tokens");
       console.error("Swap error:", error);
+      notify.transaction.error("Failed to swap tokens");
     }
   };
-
   // Switch tokens
   const handleSwitchTokens = () => {
     setTokenIn(tokenOut as `0x${string}`);
